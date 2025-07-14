@@ -12,24 +12,42 @@
 
 static bool
 is_black_frame(const AVFrame *frame) {
-    // A simple heuristic: check if the average luminance is very low.
-    // This is a basic implementation and might need to be adjusted
-    // for different video sources and conditions.
+    // A more robust heuristic: check if the average luminance is very low.
+    // Support multiple pixel formats and use a more reasonable threshold.
 
-    if (frame->format != AV_PIX_FMT_YUV420P) {
-        // This detector only supports YUV420P for now
-        return false;
-    }
-
-    long long luma_sum = 0;
-    for (int i = 0; i < frame->height; i++) {
-        for (int j = 0; j < frame->width; j++) {
-            luma_sum += frame->data[0][i * frame->linesize[0] + j];
+    if (frame->format == AV_PIX_FMT_YUV420P || frame->format == AV_PIX_FMT_NV12 || frame->format == AV_PIX_FMT_NV21) {
+        // For YUV formats, check the Y (luminance) plane
+        long long luma_sum = 0;
+        int total_pixels = frame->width * frame->height;
+        
+        for (int i = 0; i < frame->height; i++) {
+            for (int j = 0; j < frame->width; j++) {
+                luma_sum += frame->data[0][i * frame->linesize[0] + j];
+            }
         }
+        
+        double avg_luma = (double)luma_sum / total_pixels;
+        LOGD("Frame luminance: %.2f (threshold: 30)", avg_luma);
+        return avg_luma < 30; // Increased threshold for better detection
+    } else if (frame->format == AV_PIX_FMT_RGB24 || frame->format == AV_PIX_FMT_BGR24) {
+        // For RGB formats, check average brightness across all channels
+        long long total_sum = 0;
+        int total_samples = frame->width * frame->height * 3;
+        
+        for (int i = 0; i < frame->height; i++) {
+            for (int j = 0; j < frame->width * 3; j++) {
+                total_sum += frame->data[0][i * frame->linesize[0] + j];
+            }
+        }
+        
+        double avg_brightness = (double)total_sum / total_samples;
+        LOGD("Frame brightness: %.2f (threshold: 30)", avg_brightness);
+        return avg_brightness < 30;
     }
-
-    double avg_luma = (double)luma_sum / (frame->width * frame->height);
-    return avg_luma < 10; // Threshold for black frame
+    
+    // For unsupported formats, log and return false
+    LOGD("Unsupported pixel format for black frame detection: %d", frame->format);
+    return false;
 }
 
 static bool
@@ -52,16 +70,22 @@ sc_black_frame_detector_sink_push(struct sc_frame_sink *sink,
     struct sc_black_frame_detector *bfd = 
         (struct sc_black_frame_detector *)((char *)sink - offsetof(struct sc_black_frame_detector, frame_sink));
 
+    LOGD("Processing frame: %dx%d, format: %d", frame->width, frame->height, frame->format);
+    
     if (is_black_frame(frame)) {
         bfd->black_frame_count++;
-        if (bfd->black_frame_count >= 1) { // Trigger after 3 consecutive black frames
-            LOGI("Black frame detected, requesting video reset");
+        LOGI("Black frame detected! Count: %d", bfd->black_frame_count);
+        if (bfd->black_frame_count >= 2) { // Trigger after 3 consecutive black frames
+            LOGI("3 consecutive black frames detected, requesting video reset");
             SDL_Event event;
             event.type = SC_EVENT_RESET_VIDEO;
             SDL_PushEvent(&event);
             bfd->black_frame_count = 0;
         }
     } else {
+        if (bfd->black_frame_count > 0) {
+            LOGD("Normal frame detected, resetting black frame count from %d", bfd->black_frame_count);
+        }
         bfd->black_frame_count = 0;
     }
 
