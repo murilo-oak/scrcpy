@@ -15,6 +15,7 @@
 #endif
 
 #include "audio_player.h"
+#include "black_frame_detector.h"
 #include "controller.h"
 #include "decoder.h"
 #include "delay_buffer.h"
@@ -55,6 +56,7 @@ struct scrcpy {
     struct sc_decoder audio_decoder;
     struct sc_recorder recorder;
     struct sc_delay_buffer video_buffer;
+    struct sc_black_frame_detector bfd;
 #ifdef HAVE_V4L2
     struct sc_v4l2_sink v4l2_sink;
     struct sc_delay_buffer v4l2_buffer;
@@ -188,15 +190,6 @@ reset_video(struct scrcpy *s) {
     if (!sc_controller_push_msg(&s->controller, &msg)) {
         LOGW("Could not request reset video");
     }
-}
-
-static Uint32
-reset_video_timer_callback(Uint32 interval, void *param) {
-    (void) param;
-    SDL_Event event;
-    event.type = SC_EVENT_RESET_VIDEO;
-    SDL_PushEvent(&event);
-    return interval;
 }
 
 static enum scrcpy_exit_code
@@ -446,7 +439,6 @@ scrcpy(struct scrcpy_options *options) {
     bool timeout_started = false;
 
     struct sc_acksync *acksync = NULL;
-    SDL_TimerID reset_timer = 0;
 
     uint32_t scid = scrcpy_generate_scid();
 
@@ -625,8 +617,11 @@ scrcpy(struct scrcpy_options *options) {
 #endif
     if (needs_video_decoder) {
         sc_decoder_init(&s->video_decoder, "video");
+        sc_black_frame_detector_init(&s->bfd);
         sc_packet_source_add_sink(&s->video_demuxer.packet_source,
                                   &s->video_decoder.packet_sink);
+        sc_frame_source_add_sink(&s->video_decoder.frame_source,
+                                 &s->bfd.frame_sink);
     }
     if (needs_audio_decoder) {
         sc_decoder_init(&s->audio_decoder, "audio");
@@ -824,13 +819,6 @@ aoa_complete:
         controller_started = true;
     }
 
-    if (options->control) {
-        reset_timer = SDL_AddTimer(10000, reset_video_timer_callback, NULL);
-        if (!reset_timer) {
-            LOGW("Could not create reset video timer: %s", SDL_GetError());
-        }
-    }
-
     // There is a controller if and only if control is enabled
     assert(options->control == !!controller);
 
@@ -992,9 +980,6 @@ aoa_complete:
     }
 
 end:
-    if (reset_timer) {
-        SDL_RemoveTimer(reset_timer);
-    }
     if (timeout_started) {
         sc_timeout_stop(&s->timeout);
     }
