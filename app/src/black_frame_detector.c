@@ -78,7 +78,7 @@ sc_black_frame_detector_sink_push(struct sc_frame_sink *sink,
     
     if (is_black_frame(frame)) {
         bfd->black_frame_count++;
-        LOGI("Black frame detected! Count: %d in current episode", bfd->black_frame_count);
+        LOGD("Black frame detected! Count: %d in current episode", bfd->black_frame_count);
         
         // If we see too many consecutive black frames (>10), it's likely screen off, not blinking
         if (bfd->black_frame_count > 10) {
