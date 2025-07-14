@@ -52,9 +52,9 @@ is_black_frame(const AVFrame *frame) {
 
 static bool
 sc_black_frame_detector_sink_open(struct sc_frame_sink *sink,
-                                  const struct sc_video_stream_params *params) {
+                                  const AVCodecContext *ctx) {
     (void) sink;
-    (void) params;
+    (void) ctx;
     return true;
 }
 
