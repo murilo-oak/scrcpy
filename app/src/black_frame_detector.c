@@ -80,10 +80,13 @@ sc_black_frame_detector_sink_push(struct sc_frame_sink *sink,
         bfd->black_frame_count++;
         LOGD("Black frame detected! Count: %d in current episode", bfd->black_frame_count);
         
-        // If we see too many consecutive black frames (>10), it's likely screen off, not blinking
-        if (bfd->black_frame_count > 10) {
-            LOGD("Too many consecutive black frames (%d), likely screen off - ignoring", bfd->black_frame_count);
-            bfd->black_frame_count = 0; // Reset to avoid overflow
+        // If we see 10 seconds of consecutive black frames (~300 frames at 30fps), trigger reset
+        if (bfd->black_frame_count >= 300) {
+            LOGI("Full black screen for 10 seconds (%d frames), requesting video reset", bfd->black_frame_count);
+            SDL_Event event;
+            event.type = SC_EVENT_RESET_VIDEO;
+            SDL_PushEvent(&event);
+            bfd->black_frame_count = 0; // Reset after triggering
             bfd->recent_black_episodes = 0; // Reset episode tracking
             return true;
         }
