@@ -175,6 +175,30 @@ sdl_configure(bool video_playback, bool disable_screensaver) {
     }
 }
 
+static void
+reset_video(struct scrcpy *s) {
+    if (s->controller.stopped) {
+        return;
+    }
+
+    LOGI("Requesting to reset video");
+    struct sc_control_msg msg;
+    msg.type = SC_CONTROL_MSG_TYPE_RESET_VIDEO;
+
+    if (!sc_controller_push_msg(&s->controller, &msg)) {
+        LOGW("Could not request reset video");
+    }
+}
+
+static Uint32
+reset_video_timer_callback(Uint32 interval, void *param) {
+    (void) param;
+    SDL_Event event;
+    event.type = SC_EVENT_RESET_VIDEO;
+    SDL_PushEvent(&event);
+    return interval;
+}
+
 static enum scrcpy_exit_code
 event_loop(struct scrcpy *s, bool has_screen) {
     SDL_Event event;
@@ -198,6 +222,10 @@ event_loop(struct scrcpy *s, bool has_screen) {
             case SC_EVENT_TIME_LIMIT_REACHED:
                 LOGI("Time limit reached");
                 return SCRCPY_EXIT_SUCCESS;
+            case SC_EVENT_RESET_VIDEO:
+                LOGI("Resetting video capture/encoding");
+                reset_video(s);
+                break;
             case SDL_QUIT:
                 LOGD("User requested to quit");
                 return SCRCPY_EXIT_SUCCESS;
@@ -418,6 +446,7 @@ scrcpy(struct scrcpy_options *options) {
     bool timeout_started = false;
 
     struct sc_acksync *acksync = NULL;
+    SDL_TimerID reset_timer = 0;
 
     uint32_t scid = scrcpy_generate_scid();
 
@@ -795,6 +824,13 @@ aoa_complete:
         controller_started = true;
     }
 
+    if (options->control) {
+        reset_timer = SDL_AddTimer(10000, reset_video_timer_callback, NULL);
+        if (!reset_timer) {
+            LOGW("Could not create reset video timer: %s", SDL_GetError());
+        }
+    }
+
     // There is a controller if and only if control is enabled
     assert(options->control == !!controller);
 
@@ -956,6 +992,9 @@ aoa_complete:
     }
 
 end:
+    if (reset_timer) {
+        SDL_RemoveTimer(reset_timer);
+    }
     if (timeout_started) {
         sc_timeout_stop(&s->timeout);
     }
