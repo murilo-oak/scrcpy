@@ -70,23 +70,54 @@ sc_black_frame_detector_sink_push(struct sc_frame_sink *sink,
     struct sc_black_frame_detector *bfd = 
         (struct sc_black_frame_detector *)((char *)sink - offsetof(struct sc_black_frame_detector, frame_sink));
 
-    LOGD("Processing frame: %dx%d, format: %d", frame->width, frame->height, frame->format);
+    bfd->total_frames_processed++;
+    bfd->frames_since_last_black_episode++;
+    
+    LOGD("Processing frame %d: %dx%d, format: %d", 
+         bfd->total_frames_processed, frame->width, frame->height, frame->format);
     
     if (is_black_frame(frame)) {
         bfd->black_frame_count++;
-        LOGI("Black frame detected! Count: %d", bfd->black_frame_count);
-        if (bfd->black_frame_count >= 2) { // Trigger after 3 consecutive black frames
-            LOGI("3 consecutive black frames detected, requesting video reset");
-            SDL_Event event;
-            event.type = SC_EVENT_RESET_VIDEO;
-            SDL_PushEvent(&event);
-            bfd->black_frame_count = 0;
+        LOGI("Black frame detected! Count: %d in current episode", bfd->black_frame_count);
+        
+        // If we see too many consecutive black frames (>10), it's likely screen off, not blinking
+        if (bfd->black_frame_count > 10) {
+            LOGD("Too many consecutive black frames (%d), likely screen off - ignoring", bfd->black_frame_count);
+            bfd->black_frame_count = 0; // Reset to avoid overflow
+            bfd->recent_black_episodes = 0; // Reset episode tracking
+            return true;
         }
     } else {
         if (bfd->black_frame_count > 0) {
-            LOGD("Normal frame detected, resetting black frame count from %d", bfd->black_frame_count);
+            LOGD("Normal frame detected, had %d black frames in this episode", bfd->black_frame_count);
+            
+            // If we had a short burst of black frames (2-5), count it as a blinking episode
+            if (bfd->black_frame_count >= 2 && bfd->black_frame_count <= 5) {
+                bfd->recent_black_episodes++;
+                bfd->frames_since_last_black_episode = 0;
+                LOGI("Blinking episode detected! Episode count: %d", bfd->recent_black_episodes);
+                
+                // If we see multiple blinking episodes in a short time, trigger reset
+                if (bfd->recent_black_episodes >= 3) {
+                    LOGI("Multiple blinking episodes detected (%d), requesting video reset", bfd->recent_black_episodes);
+                    SDL_Event event;
+                    event.type = SC_EVENT_RESET_VIDEO;
+                    SDL_PushEvent(&event);
+                    bfd->recent_black_episodes = 0; // Reset after triggering
+                }
+            }
+            
+            bfd->black_frame_count = 0;
         }
-        bfd->black_frame_count = 0;
+    }
+    
+    // Reset episode counter if too much time has passed without black episodes
+    if (bfd->frames_since_last_black_episode > 300) { // ~10 seconds at 30fps
+        if (bfd->recent_black_episodes > 0) {
+            LOGD("Resetting black episode count due to timeout");
+        }
+        bfd->recent_black_episodes = 0;
+        bfd->frames_since_last_black_episode = 0;
     }
 
     return true;
@@ -102,5 +133,8 @@ static const struct sc_frame_sink_ops sc_black_frame_detector_sink_ops = {
 void
 sc_black_frame_detector_init(struct sc_black_frame_detector *bfd) {
     bfd->black_frame_count = 0;
+    bfd->total_frames_processed = 0;
+    bfd->recent_black_episodes = 0;
+    bfd->frames_since_last_black_episode = 0;
     bfd->frame_sink.ops = &sc_black_frame_detector_sink_ops;
 }
