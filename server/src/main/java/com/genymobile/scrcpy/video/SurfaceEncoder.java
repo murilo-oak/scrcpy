@@ -31,6 +31,7 @@ public class SurfaceEncoder implements AsyncProcessor {
     private static final int DEFAULT_I_FRAME_INTERVAL = 10; // seconds
     private static final int REPEAT_FRAME_DELAY_US = 100_000; // repeat after 100ms
     private static final String KEY_MAX_FPS_TO_ENCODER = "max-fps-to-encoder";
+    private static final long STILL_IMAGE_TIMEOUT_MS = 4000; // 4 seconds
 
     // Keep the values in descending order
     private static final int[] MAX_SIZE_FALLBACK = {2560, 1920, 1600, 1280, 1024, 800};
@@ -46,6 +47,7 @@ public class SurfaceEncoder implements AsyncProcessor {
 
     private boolean firstFrameSent;
     private int consecutiveErrors;
+    private long lastFrameTimestamp;
 
     private Thread thread;
     private final AtomicBoolean stopped = new AtomicBoolean();
@@ -85,6 +87,9 @@ public class SurfaceEncoder implements AsyncProcessor {
                 format.setInteger(MediaFormat.KEY_WIDTH, size.getWidth());
                 format.setInteger(MediaFormat.KEY_HEIGHT, size.getHeight());
 
+                // Reset timestamp when preparing a new capture cycle
+                lastFrameTimestamp = 0;
+
                 Surface surface = null;
                 boolean mediaCodecStarted = false;
                 boolean captureStarted = false;
@@ -97,6 +102,9 @@ public class SurfaceEncoder implements AsyncProcessor {
 
                     mediaCodec.start();
                     mediaCodecStarted = true;
+                    
+                    // Initialize timestamp when starting encoding
+                    lastFrameTimestamp = System.currentTimeMillis();
 
                     // Set the MediaCodec instance to "interrupt" (by signaling an EOS) on reset
                     reset.setRunningMediaCodec(mediaCodec);
@@ -199,9 +207,21 @@ public class SurfaceEncoder implements AsyncProcessor {
 
         boolean eos;
         do {
-            int outputBufferId = codec.dequeueOutputBuffer(bufferInfo, -1);
+            int outputBufferId = codec.dequeueOutputBuffer(bufferInfo, 1000); // 1 second timeout instead of -1
             try {
                 eos = (bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
+                
+                if (outputBufferId == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                    // Check if image has been still for too long
+                    long currentTime = System.currentTimeMillis();
+                    if (lastFrameTimestamp > 0 && (currentTime - lastFrameTimestamp) > STILL_IMAGE_TIMEOUT_MS) {
+                        Ln.i("Image still for " + STILL_IMAGE_TIMEOUT_MS + "ms, resetting encoding");
+                        reset.reset();
+                        return; // Exit encoding loop to trigger reset
+                    }
+                    continue; // Try again
+                }
+                
                 // On EOS, there might be data or not, depending on bufferInfo.size
                 if (outputBufferId >= 0 && bufferInfo.size > 0) {
                     ByteBuffer codecBuffer = codec.getOutputBuffer(outputBufferId);
@@ -211,6 +231,7 @@ public class SurfaceEncoder implements AsyncProcessor {
                         // If this is not a config packet, then it contains a frame
                         firstFrameSent = true;
                         consecutiveErrors = 0;
+                        lastFrameTimestamp = System.currentTimeMillis(); // Update timestamp for real frames
                     }
 
                     streamer.writePacket(codecBuffer, bufferInfo);
