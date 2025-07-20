@@ -31,7 +31,8 @@ main_scrcpy(int argc, char *argv[]) {
 #endif
 
     printf("scrcpy " SCRCPY_VERSION
-           " <https://github.com/Genymobile/scrcpy>\n");
+           " <https://github.com/joranmarcy/scrcpy>\n");
+    printf("Includes fix for Meta Quest 2/3/3s\n");
 
     struct scrcpy_cli_args args = {
         .opts = scrcpy_options_default,
