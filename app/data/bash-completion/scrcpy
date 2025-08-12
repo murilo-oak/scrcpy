@@ -39,6 +39,7 @@ _scrcpy() {
         --list-camera-sizes
         --list-cameras
         --list-displays
+        --force-list-displays
         --list-encoders
         -m --max-size=
         -M

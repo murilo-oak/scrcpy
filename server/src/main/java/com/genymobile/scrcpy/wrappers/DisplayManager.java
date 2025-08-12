@@ -22,6 +22,9 @@ import java.lang.reflect.Proxy;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @SuppressLint("PrivateApi,DiscouragedPrivateApi")
 public final class DisplayManager {
 
@@ -129,7 +132,7 @@ public final class DisplayManager {
             Object displayInfo = method.invoke(manager, displayId);
             if (displayInfo == null) {
                 // fallback when displayInfo is null
-                return getDisplayInfoFromDumpsysDisplay(displayId);
+                return null;
             }
             Class<?> cls = displayInfo.getClass();
             // width and height already take the rotation into account
@@ -152,6 +155,21 @@ public final class DisplayManager {
         } catch (ReflectiveOperationException e) {
             throw new AssertionError(e);
         }
+    }
+
+    public int[] getDisplayIdsForced() {
+        List<Integer> validIds = new ArrayList<>();
+        int maxIds = 5000;
+
+        for(int i = 0; i <= maxIds; i++)
+        {
+            Object displayInfo = getDisplayInfo(i);
+            if (displayInfo != null) {
+                validIds.add(i);
+            }
+        }
+        
+        return validIds.stream().mapToInt(Integer::intValue).toArray();
     }
 
     private Method getCreateVirtualDisplayMethod() throws NoSuchMethodException {

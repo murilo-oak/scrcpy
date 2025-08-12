@@ -68,7 +68,7 @@ public class ScreenCapture extends SurfaceCapture {
     public void prepare() throws ConfigurationException {
         displayInfo = ServiceManager.getDisplayManager().getDisplayInfo(displayId);
         if (displayInfo == null) {
-            Ln.e("Display " + displayId + " not found\n" + LogUtils.buildDisplayListMessage());
+            Ln.e("Display " + displayId + " not found\n" + LogUtils.buildDisplayListMessage(false));
             throw new ConfigurationException("Unknown display id: " + displayId);
         }
 
