@@ -316,6 +316,7 @@ struct scrcpy_options {
     bool camera_high_speed;
 #define SC_OPTION_LIST_ENCODERS 0x1
 #define SC_OPTION_LIST_DISPLAYS 0x2
+#define SC_OPTION_FORCE_LIST_DISPLAYS 0x20
 #define SC_OPTION_LIST_CAMERAS 0x4
 #define SC_OPTION_LIST_CAMERA_SIZES 0x8
 #define SC_OPTION_LIST_APPS 0x10

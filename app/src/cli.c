@@ -73,6 +73,7 @@ enum {
     OPT_AUDIO_ENCODER,
     OPT_LIST_ENCODERS,
     OPT_LIST_DISPLAYS,
+    OPT_FORCE_LIST_DISPLAYS,
     OPT_REQUIRE_AUDIO,
     OPT_AUDIO_BUFFER,
     OPT_AUDIO_OUTPUT_BUFFER,
@@ -525,6 +526,11 @@ static const struct sc_option options[] = {
         .longopt_id = OPT_LIST_DISPLAYS,
         .longopt = "list-displays",
         .text = "List device displays.",
+    },
+    {
+        .longopt_id = OPT_FORCE_LIST_DISPLAYS,
+        .longopt = "force-list-displays",
+        .text = "Force list device displays.",
     },
     {
         .longopt_id = OPT_LIST_ENCODERS,
@@ -2711,6 +2717,9 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
                 break;
             case OPT_LIST_DISPLAYS:
                 opts->list |= SC_OPTION_LIST_DISPLAYS;
+                break;
+            case OPT_FORCE_LIST_DISPLAYS:
+                opts->list |= SC_OPTION_FORCE_LIST_DISPLAYS;
                 break;
             case OPT_LIST_CAMERAS:
                 opts->list |= SC_OPTION_LIST_CAMERAS;
