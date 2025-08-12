@@ -12,6 +12,8 @@
 #include "shortcut_mod.h"
 #include "util/log.h"
 
+SDL_DisplayMode dm;
+
 void
 sc_input_manager_init(struct sc_input_manager *im,
                       const struct sc_input_manager_params *params) {
@@ -46,6 +48,11 @@ sc_input_manager_init(struct sc_input_manager *im,
     im->key_repeat = 0;
 
     im->next_sequence = 1; // 0 is reserved for SC_SEQUENCE_INVALID
+
+    if(SDL_GetDesktopDisplayMode(0, &dm) != 0)
+    {
+        LOGD("Could not get Display Mode");
+    }
 }
 
 static void
@@ -629,39 +636,89 @@ sc_input_manager_get_position(struct sc_input_manager *im, int32_t x,
     };
 }
 
+static int32_t xPrev;
+static int32_t yPrev;
+
+static bool
+is_remote_mouse(int32_t x, int32_t y) { 
+    return abs(x + y) > REMOTE_MOUSE_THRESHOLD;
+}
+
+static void remap_remote_mouse_values(int32_t x, int32_t y, int32_t *xCorrection, int32_t *yCorrection) { 
+        
+    // Apply basic correction
+    *xCorrection = CORRECTION_MULTIPLIER * (x - xPrev);
+    *yCorrection = CORRECTION_MULTIPLIER * (y - yPrev);
+    
+    // Edge detection and boost
+    // Bottom edge
+    if(y >= dm.h - EDGE_THRESHOLD && *yCorrection < EDGE_CORRECTION_THRESHOLD)    
+    {
+        *yCorrection += 50; 
+    }
+
+    // Right edge
+    if(x >= dm.w - EDGE_THRESHOLD && *xCorrection < EDGE_CORRECTION_THRESHOLD)    
+    {
+        *xCorrection += 50; 
+    }
+
+    // Left edge
+    if(x < EDGE_THRESHOLD && *xCorrection < EDGE_CORRECTION_THRESHOLD)    
+    {
+        *xCorrection -= 50; 
+    }
+}
+
 static void
 sc_input_manager_process_mouse_motion(struct sc_input_manager *im,
                                       const SDL_MouseMotionEvent *event) {
     if (event->which == SDL_TOUCH_MOUSEID) {
         // simulated from touch events, so it's a duplicate
         return;
-    }
+    }    
 
+    // Initialize movement values
+    int32_t x = event->xrel;
+    int32_t y = event->yrel;
+    
+    int32_t xCorrection = x;
+    int32_t yCorrection = y;
+    
+    // Apply remote mouse corrections if needed
+    if(is_remote_mouse(x, y))
+    {
+        remap_remote_mouse_values(x, y, &xCorrection, &yCorrection);
+    }
+    
     struct sc_mouse_motion_event evt = {
-        .position = sc_input_manager_get_position(im, event->x, event->y),
-        .pointer_id = im->vfinger_down ? SC_POINTER_ID_GENERIC_FINGER
-                                       : SC_POINTER_ID_MOUSE,
-        .xrel = event->xrel,
-        .yrel = event->yrel,
-        .buttons_state = im->mouse_buttons_state,
+            .position = sc_input_manager_get_position(im, event->x, event->y),
+            .pointer_id = im->vfinger_down ? SC_POINTER_ID_GENERIC_FINGER
+                                           : SC_POINTER_ID_MOUSE,
+            .xrel = xCorrection,
+            .yrel = yCorrection,
+            .buttons_state = im->mouse_buttons_state,
     };
 
     assert(im->mp->ops->process_mouse_motion);
     im->mp->ops->process_mouse_motion(im->mp, &evt);
 
-    // vfinger must never be used in relative mode
+    //vfinger must never be used in relative mode
     assert(!im->mp->relative_mode || !im->vfinger_down);
 
     if (im->vfinger_down) {
         assert(!im->mp->relative_mode); // assert one more time
         struct sc_point mouse =
-           sc_screen_convert_window_to_frame_coords(im->screen, event->x,
-                                                    event->y);
+                sc_screen_convert_window_to_frame_coords(im->screen, event->x,
+                                                         event->y);
         struct sc_point vfinger = inverse_point(mouse, im->screen->frame_size,
                                                 im->vfinger_invert_x,
                                                 im->vfinger_invert_y);
         simulate_virtual_finger(im, AMOTION_EVENT_ACTION_MOVE, vfinger);
     }
+
+    xPrev = x;
+    yPrev = y;
 }
 
 static void
