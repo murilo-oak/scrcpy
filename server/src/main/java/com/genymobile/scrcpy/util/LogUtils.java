@@ -91,7 +91,7 @@ public final class LogUtils {
         int[] displayIds; 
         
         if(useForceListDisplayMethod) {
-            displayIds = displayManager.getDisplayIdsForced();
+            displayIds = displayManager.getDisplayIdsDumpsys();
         }
         else {
             displayIds = displayManager.getDisplayIds();

@@ -132,7 +132,7 @@ public final class DisplayManager {
             Object displayInfo = method.invoke(manager, displayId);
             if (displayInfo == null) {
                 // fallback when displayInfo is null
-                return null;
+                return getDisplayInfoFromDumpsysDisplay(displayId);
             }
             Class<?> cls = displayInfo.getClass();
             // width and height already take the rotation into account
@@ -157,19 +157,31 @@ public final class DisplayManager {
         }
     }
 
-    public int[] getDisplayIdsForced() {
-        List<Integer> validIds = new ArrayList<>();
-        int maxIds = 5000;
+    public int[] getDisplayIdsDumpsys() {
+        try {
+            String dumpsysDisplayOutput = Command.execReadOutput("dumpsys", "display");
+            return parseAllDisplayIds(dumpsysDisplayOutput);
+        }
+        catch (Exception e) {
+            Ln.e("Could not get display info from \"dumpsys display\" output", e);
+            return null;
+        }
+    }
 
-        for(int i = 0; i <= maxIds; i++)
-        {
-            Object displayInfo = getDisplayInfo(i);
-            if (displayInfo != null) {
-                validIds.add(i);
+    public static int[] parseAllDisplayIds(String dumpsysDisplayOutput) {
+        List<Integer> displayIds = new ArrayList<>();
+        
+        Pattern idPattern = Pattern.compile("displayId (\\d+)");
+        Matcher m = idPattern.matcher(dumpsysDisplayOutput);
+        
+        while (m.find()) {
+            int displayId = Integer.parseInt(m.group(1));
+            if (!displayIds.contains(displayId)) {
+                displayIds.add(displayId);
             }
         }
-        
-        return validIds.stream().mapToInt(Integer::intValue).toArray();
+    
+        return displayIds.stream().mapToInt(Integer::intValue).toArray();
     }
 
     private Method getCreateVirtualDisplayMethod() throws NoSuchMethodException {
