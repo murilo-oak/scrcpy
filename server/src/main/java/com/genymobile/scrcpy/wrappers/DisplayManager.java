@@ -22,6 +22,9 @@ import java.lang.reflect.Proxy;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @SuppressLint("PrivateApi,DiscouragedPrivateApi")
 public final class DisplayManager {
 
@@ -158,6 +161,33 @@ public final class DisplayManager {
         } catch (ReflectiveOperationException e) {
             throw new AssertionError(e);
         }
+    }
+
+    public int[] getDisplayIdsDumpsys() {
+        try {
+            String dumpsysDisplayOutput = Command.execReadOutput("dumpsys", "display");
+            return parseAllDisplayIds(dumpsysDisplayOutput);
+        }
+        catch (Exception e) {
+            Ln.e("Could not get display info from \"dumpsys display\" output", e);
+            return null;
+        }
+    }
+
+    public static int[] parseAllDisplayIds(String dumpsysDisplayOutput) {
+        List<Integer> displayIds = new ArrayList<>();
+        
+        Pattern idPattern = Pattern.compile("displayId (\\d+)");
+        Matcher m = idPattern.matcher(dumpsysDisplayOutput);
+        
+        while (m.find()) {
+            int displayId = Integer.parseInt(m.group(1));
+            if (!displayIds.contains(displayId)) {
+                displayIds.add(displayId);
+            }
+        }
+    
+        return displayIds.stream().mapToInt(Integer::intValue).toArray();
     }
 
     private Method getCreateVirtualDisplayMethod() throws NoSuchMethodException {

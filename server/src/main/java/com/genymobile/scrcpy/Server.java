@@ -252,7 +252,10 @@ public final class Server {
                 Ln.i(LogUtils.buildAudioEncoderListMessage());
             }
             if (options.getListDisplays()) {
-                Ln.i(LogUtils.buildDisplayListMessage());
+                Ln.i(LogUtils.buildDisplayListMessage(false));
+            }
+            if(options.getForceListDisplays()) {
+                Ln.i(LogUtils.buildDisplayListMessage(true));
             }
             if (options.getListCameras() || options.getListCameraSizes()) {
                 Workarounds.apply();

@@ -85,10 +85,18 @@ public final class LogUtils {
         return "hybrid";
     }
 
-    public static String buildDisplayListMessage() {
+    public static String buildDisplayListMessage(boolean useForceListDisplayMethod) {
         StringBuilder builder = new StringBuilder("List of displays:");
         DisplayManager displayManager = ServiceManager.getDisplayManager();
-        int[] displayIds = displayManager.getDisplayIds();
+        int[] displayIds; 
+        
+        if(useForceListDisplayMethod) {
+            displayIds = displayManager.getDisplayIdsDumpsys();
+        }
+        else {
+            displayIds = displayManager.getDisplayIds();
+        }
+
         if (displayIds == null || displayIds.length == 0) {
             builder.append("\n    (none)");
         } else {

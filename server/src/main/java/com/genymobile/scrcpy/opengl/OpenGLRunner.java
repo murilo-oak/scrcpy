@@ -37,6 +37,9 @@ public final class OpenGLRunner {
     private int textureId;
 
     private boolean stopped;
+    private boolean discardBlackTextures = true;
+    private static final float BLACK_THRESHOLD = 0.1f; // Threshold for considering a pixel "black"
+    private static final float BLACK_PIXEL_RATIO_THRESHOLD = 0.95f; // Minimum ratio of black pixels to discard frame
 
     public OpenGLRunner(OpenGLFilter filter, float[] overrideTransformMatrix) {
         this.filter = filter;
@@ -101,6 +104,16 @@ public final class OpenGLRunner {
 
         // Synchronization is ok: inputSurface is written before sem.release() and read after sem.acquire()
         return inputSurface;
+    }
+
+    /**
+     * Enable or disable black texture discarding.
+     * When enabled, frames that are predominantly black will be skipped.
+     * 
+     * @param enabled true to enable black texture discarding, false to disable
+     */
+    public void setDiscardBlackTextures(boolean enabled) {
+        this.discardBlackTextures = enabled;
     }
 
     private void run(Size inputSize, Size outputSize, Surface outputSurface) throws OpenGLException {
@@ -205,10 +218,130 @@ public final class OpenGLRunner {
             surfaceTexture.getTransformMatrix(matrix);
         }
 
+        // Check if texture is predominantly black and should be discarded
+        if (discardBlackTextures && isTextureBlack()) {
+            return; // Skip rendering this frame
+        }
+
         filter.draw(textureId, matrix);
 
         EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, surfaceTexture.getTimestamp());
         EGL14.eglSwapBuffers(eglDisplay, eglSurface);
+    }
+
+    /**
+     * Checks if the current texture is predominantly black by sampling pixels
+     * and calculating the ratio of black pixels.
+     * 
+     * @return true if the texture should be discarded (too many black pixels)
+     */
+    private boolean isTextureBlack() {
+        // Create a small framebuffer to sample the texture
+        int[] fbo = new int[1];
+        int[] texture = new int[1];
+        int sampleSize = 32; // Sample size for efficiency
+        
+        // Generate framebuffer and texture for sampling
+        GLES20.glGenFramebuffers(1, fbo, 0);
+        GLES20.glGenTextures(1, texture, 0);
+        
+        // Setup sampling texture
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texture[0]);
+        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, sampleSize, sampleSize, 0, 
+                           GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        
+        // Bind framebuffer
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo[0]);
+        GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, 
+                                     GLES20.GL_TEXTURE_2D, texture[0], 0);
+        
+        // Save current viewport
+        int[] viewport = new int[4];
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, viewport, 0);
+        
+        // Render to sampling framebuffer
+        GLES20.glViewport(0, 0, sampleSize, sampleSize);
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+        
+        // Use a simple filter to render the texture for sampling
+        // We'll create a temporary simple rendering
+        renderForSampling();
+        
+        // Read pixels
+        byte[] pixels = new byte[sampleSize * sampleSize * 4]; // RGBA
+        GLES20.glReadPixels(0, 0, sampleSize, sampleSize, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, 
+                           java.nio.ByteBuffer.wrap(pixels));
+        
+        // Restore original viewport and framebuffer
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+        GLES20.glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        
+        // Cleanup
+        GLES20.glDeleteFramebuffers(1, fbo, 0);
+        GLES20.glDeleteTextures(1, texture, 0);
+        
+        // Analyze pixels
+        int blackPixels = 0;
+        int totalPixels = sampleSize * sampleSize;
+        
+        for (int i = 0; i < pixels.length; i += 4) {
+            // Convert unsigned bytes to int values (0-255)
+            int r = pixels[i] & 0xFF;
+            int g = pixels[i + 1] & 0xFF;
+            int b = pixels[i + 2] & 0xFF;
+            
+            // Calculate luminance (perceived brightness)
+            float luminance = (0.299f * r + 0.587f * g + 0.114f * b) / 255.0f;
+            
+            if (luminance < BLACK_THRESHOLD) {
+                blackPixels++;
+            }
+        }
+        
+        float blackRatio = (float) blackPixels / totalPixels;
+        return blackRatio > BLACK_PIXEL_RATIO_THRESHOLD;
+    }
+    
+    /**
+     * Simple rendering for texture sampling - renders the external texture to current framebuffer
+     */
+    private void renderForSampling() {
+        // Simple vertex shader for sampling
+        String vertexShader = "#version 100\n" +
+                "attribute vec4 a_position;\n" +
+                "attribute vec2 a_texCoord;\n" +
+                "varying vec2 v_texCoord;\n" +
+                "void main() {\n" +
+                "  gl_Position = a_position;\n" +
+                "  v_texCoord = a_texCoord;\n" +
+                "}";
+        
+        // Simple fragment shader for sampling external texture
+        String fragmentShader = "#version 100\n" +
+                "#extension GL_OES_EGL_image_external : require\n" +
+                "precision mediump float;\n" +
+                "uniform samplerExternalOES u_texture;\n" +
+                "varying vec2 v_texCoord;\n" +
+                "void main() {\n" +
+                "  gl_FragColor = texture2D(u_texture, v_texCoord);\n" +
+                "}";
+        
+        // Note: In a production implementation, you'd want to cache this program
+        // and reuse it rather than creating it each time. For now, we'll use
+        // a simplified approach that leverages the existing filter.
+        
+        // Since we have access to the filter, we can temporarily use it
+        // This is a simplified approach - the filter.draw will render the texture
+        float[] identityMatrix = {
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
+        };
+        
+        filter.draw(textureId, identityMatrix);
     }
 
     public void stopAndRelease() {

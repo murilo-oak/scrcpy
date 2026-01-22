@@ -10,6 +10,12 @@
 
 #include "coords.h"
 
+#define REMOTE_MOUSE_THRESHOLD       20
+#define EDGE_BOOST_AMOUNT            50
+#define EDGE_THRESHOLD               5
+#define CORRECTION_MULTIPLIER        4
+#define EDGE_CORRECTION_THRESHOLD    10
+
 /* The representation of input events in scrcpy is very close to the SDL API,
  * for simplicity.
  *

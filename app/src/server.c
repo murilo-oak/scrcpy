@@ -423,6 +423,9 @@ execute_server(struct sc_server *server,
     if (params->list & SC_OPTION_LIST_DISPLAYS) {
         ADD_PARAM("list_displays=true");
     }
+    if (params->list & SC_OPTION_FORCE_LIST_DISPLAYS) {
+        ADD_PARAM("force_list_displays=true");
+    }
     if (params->list & SC_OPTION_LIST_CAMERAS) {
         ADD_PARAM("list_cameras=true");
     }

@@ -70,6 +70,7 @@ public class Options {
 
     private boolean listEncoders;
     private boolean listDisplays;
+    private boolean forceListDisplays;
     private boolean listCameras;
     private boolean listCameraSizes;
     private boolean listApps;
@@ -249,7 +250,7 @@ public class Options {
     }
 
     public boolean getList() {
-        return listEncoders || listDisplays || listCameras || listCameraSizes || listApps;
+        return listEncoders || listDisplays || listCameras || listCameraSizes || listApps || forceListDisplays;
     }
 
     public boolean getListEncoders() {
@@ -258,6 +259,10 @@ public class Options {
 
     public boolean getListDisplays() {
         return listDisplays;
+    }
+
+    public boolean getForceListDisplays() {
+        return forceListDisplays;
     }
 
     public boolean getListCameras() {
@@ -434,6 +439,9 @@ public class Options {
                     break;
                 case "list_displays":
                     options.listDisplays = Boolean.parseBoolean(value);
+                    break;
+                case "force_list_displays":
+                    options.forceListDisplays = Boolean.parseBoolean(value);
                     break;
                 case "list_cameras":
                     options.listCameras = Boolean.parseBoolean(value);
