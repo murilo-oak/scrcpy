@@ -426,6 +426,9 @@ execute_server(struct sc_server *server,
     if (params->list & SC_OPTION_FORCE_LIST_DISPLAYS) {
         ADD_PARAM("force_list_displays=true");
     }
+    if (params->use_surface_control) {
+        ADD_PARAM("use_surface_control=true");
+    }
     if (params->list & SC_OPTION_LIST_CAMERAS) {
         ADD_PARAM("list_cameras=true");
     }

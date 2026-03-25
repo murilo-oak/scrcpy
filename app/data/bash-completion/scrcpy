@@ -23,6 +23,7 @@ _scrcpy() {
         -d --select-usb
         --disable-screensaver
         --display-id=
+        --use-surface-control
         --display-ime-policy=
         --display-orientation=
         -e --select-tcpip

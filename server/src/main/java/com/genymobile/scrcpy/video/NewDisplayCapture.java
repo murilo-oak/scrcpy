@@ -57,6 +57,7 @@ public class NewDisplayCapture extends SurfaceCapture {
     private final float angle;
     private final boolean vdDestroyContent;
     private final boolean vdSystemDecorations;
+    private final boolean useSurfaceControler;
 
     private VirtualDisplay virtualDisplay;
     private Size videoSize;
@@ -79,6 +80,7 @@ public class NewDisplayCapture extends SurfaceCapture {
         this.angle = options.getAngle();
         this.vdDestroyContent = options.getVDDestroyContent();
         this.vdSystemDecorations = options.getVDSystemDecorations();
+        this.useSurfaceControler = options.getUseSurfaceControl();
     }
 
     @Override
