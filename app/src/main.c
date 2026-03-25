@@ -32,7 +32,7 @@ main_scrcpy(int argc, char *argv[]) {
 #endif
 
     printf("scrcpy " SCRCPY_VERSION
-           " <https://github.com/joranmarcy/scrcpy>\n");
+           " <https://github.com/murilo-oak/scrcpy>\n");
     printf("Includes fix for Meta Quest 2/3/3s (+2.1v)\n");
 
     struct scrcpy_cli_args args = {
