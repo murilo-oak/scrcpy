@@ -53,6 +53,7 @@ public class Options {
     private List<CodecOption> videoCodecOptions;
     private List<CodecOption> audioCodecOptions;
 
+    private boolean useSurfaceControl;
     private String videoEncoder;
     private String audioEncoder;
     private boolean powerOffScreenOnClose;
@@ -265,6 +266,10 @@ public class Options {
         return forceListDisplays;
     }
 
+    public boolean getUseSurfaceControl() {
+        return useSurfaceControl;
+    }
+
     public boolean getListCameras() {
         return listCameras;
     }
@@ -442,6 +447,9 @@ public class Options {
                     break;
                 case "force_list_displays":
                     options.forceListDisplays = Boolean.parseBoolean(value);
+                    break;
+                case "use_surface_control":
+                    options.useSurfaceControl = Boolean.parseBoolean(value);
                     break;
                 case "list_cameras":
                     options.listCameras = Boolean.parseBoolean(value);

@@ -74,6 +74,7 @@ enum {
     OPT_LIST_ENCODERS,
     OPT_LIST_DISPLAYS,
     OPT_FORCE_LIST_DISPLAYS,
+    OPT_USE_SURFACE_CONTROL,
     OPT_REQUIRE_AUDIO,
     OPT_AUDIO_BUFFER,
     OPT_AUDIO_OUTPUT_BUFFER,
@@ -531,6 +532,11 @@ static const struct sc_option options[] = {
         .longopt_id = OPT_FORCE_LIST_DISPLAYS,
         .longopt = "force-list-displays",
         .text = "Force list device displays.",
+    },
+    {
+            .longopt_id = OPT_USE_SURFACE_CONTROL,
+            .longopt = "use-surface-control",
+            .text = "Force Surface Control method.",
     },
     {
         .longopt_id = OPT_LIST_ENCODERS,
@@ -2720,6 +2726,9 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
                 break;
             case OPT_FORCE_LIST_DISPLAYS:
                 opts->list |= SC_OPTION_FORCE_LIST_DISPLAYS;
+                break;
+            case OPT_USE_SURFACE_CONTROL:
+                opts->use_surface_control = true;
                 break;
             case OPT_LIST_CAMERAS:
                 opts->list |= SC_OPTION_LIST_CAMERAS;

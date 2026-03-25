@@ -277,4 +277,24 @@ public final class DisplayManager {
             Ln.e("Could not unregister display listener", e);
         }
     }
+
+    public boolean isDisplayCreated(String uniqueIdSuffix) {
+        try {
+            int[] ids = getDisplayIds();
+            if (ids == null) return false;
+            for (int id : ids) {
+                DisplayInfo info = getDisplayInfo(id);
+                if (info != null && info.getUniqueId() != null
+                        && info.getUniqueId().contains(uniqueIdSuffix)) {
+                    Ln.d("[capture] display encontrado id=" + id
+                            + " uniqueId=" + info.getUniqueId());
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            Ln.d("[capture] isDisplayCreated error: " + e.getMessage());
+            return false;
+        }
+    }
 }

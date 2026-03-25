@@ -37,7 +37,6 @@ public class DisplaySizeMonitor {
     private Size sessionDisplaySize;
 
     private Listener listener;
-
     public void start(int displayId, Listener listener) {
         // Once started, the listener and the displayId must never change
         assert listener != null;
@@ -70,6 +69,11 @@ public class DisplaySizeMonitor {
                     if (eventDisplayId == displayId) {
                         checkDisplaySizeChanged();
                     }
+                    
+                    if (newConfig.densityDpi > 1 ) {
+                        listener.onDisplaySizeChanged();
+                    }
+
                 }
             };
             ServiceManager.getWindowManager().registerDisplayWindowListener(displayWindowListener);

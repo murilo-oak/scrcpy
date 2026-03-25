@@ -24,6 +24,7 @@ import android.os.IBinder;
 import android.view.Surface;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 public class ScreenCapture extends SurfaceCapture {
 
@@ -34,6 +35,8 @@ public class ScreenCapture extends SurfaceCapture {
     private Orientation.Lock captureOrientationLock;
     private Orientation captureOrientation;
     private final float angle;
+    private final boolean useSurfaceControl;
+
 
     private DisplayInfo displayInfo;
     private Size videoSize;
@@ -57,6 +60,7 @@ public class ScreenCapture extends SurfaceCapture {
         assert captureOrientationLock != null;
         assert captureOrientation != null;
         this.angle = options.getAngle();
+        this.useSurfaceControl = options.getUseSurfaceControl();
     }
 
     @Override
@@ -124,23 +128,26 @@ public class ScreenCapture extends SurfaceCapture {
             inputSize = videoSize;
         }
 
-        try {
-            virtualDisplay = ServiceManager.getDisplayManager()
-                    .createVirtualDisplay("scrcpy", inputSize.getWidth(), inputSize.getHeight(), displayId, surface);
-            Ln.d("Display: using DisplayManager API");
-        } catch (Exception displayManagerException) {
+        if (useSurfaceControl) {
             try {
                 display = createDisplay();
-
                 Size deviceSize = displayInfo.getSize();
                 int layerStack = displayInfo.getLayerStack();
                 setDisplaySurface(display, surface, deviceSize.toRect(), inputSize.toRect(), layerStack);
-                Ln.d("Display: using SurfaceControl API");
             } catch (Exception surfaceControlException) {
-                Ln.e("Could not create display using DisplayManager", displayManagerException);
                 Ln.e("Could not create display using SurfaceControl", surfaceControlException);
-                throw new AssertionError("Could not create display");
             }
+            
+            Ln.d("Display: using SurfaceControl API");
+        } else {
+            try {
+                virtualDisplay = ServiceManager.getDisplayManager()
+                    .createVirtualDisplay("scrcpy", inputSize.getWidth(), inputSize.getHeight(), displayId, surface);
+            } catch (Exception displayManagerException) 
+            {
+                // On Meta Quest, createVirtualDisplay throws but still creates the display
+            }
+            Ln.d("Display: using DisplayManager API");
         }
 
         if (vdListener != null) {
